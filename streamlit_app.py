@@ -56,4 +56,28 @@ if st.button("Predict"):
 
     if hasattr(model, "predict_proba"):
         p_hit = float(model.predict_proba(X)[0][1])
+        p_flop = 1.0 - p_hit
+
         st.write(f"**Hit probability:** {p_hit:.2f}")
+        st.write(f"**Flop probability:** {p_flop:.2f}")
+
+        st.markdown("#### Flop → Hit Probability")
+        # Progress bar expects 0–1
+        st.progress(p_hit)
+
+        # Labels under the bar
+        c1, c2, c3 = st.columns([1, 2, 1])
+        with c1:
+            st.caption("FLOP (0.0)")
+        with c2:
+            st.caption(f"Current: {p_hit:.2f}")
+        with c3:
+            st.caption("HIT (1.0)")
+
+        # Optional interpretation bands
+        if p_hit < 0.4:
+            st.info("Model confidence: leaning **Flop**.")
+        elif p_hit < 0.6:
+            st.warning("Model confidence: **borderline** (uncertain).")
+        else:
+            st.success("Model confidence: leaning **Hit**.")
