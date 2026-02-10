@@ -2,6 +2,7 @@ import json
 import joblib
 import pandas as pd
 import streamlit as st
+import plotly.graph_objects as go
 
 st.set_page_config(page_title="Movie Hit Predictor", page_icon="🎬", layout="centered")
 
@@ -50,34 +51,52 @@ if st.button("Predict"):
         "main_genre": main_genre,
     }])
 
-    pred = int(model.predict(X)[0])
-    label = "✅ HIT" if pred == 1 else "❌ FLOP"
-    st.markdown(f"### Result: {label}")
+    p_hit = float(model.predict_proba(X)[0][1])
+    p_flop = 1.0 - p_hit
 
-    if hasattr(model, "predict_proba"):
-        p_hit = float(model.predict_proba(X)[0][1])
-        p_flop = 1.0 - p_hit
+    # Clear result text
+    st.markdown("### Prediction")
+    st.metric("Hit probability", f"{p_hit:.2f}", help="Probability of HIT (1.0 means very likely hit)")
 
-        st.write(f"**Hit probability:** {p_hit:.2f}")
-        st.write(f"**Flop probability:** {p_flop:.2f}")
+    # ---- Interactive Gauge ----
+    fig_gauge = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=p_hit * 100,
+        number={"suffix": "%"},
+        title={"text": "Flop → Hit Gauge"},
+        gauge={
+            "axis": {"range": [0, 100]},
+            "steps": [
+                {"range": [0, 40], "name": "Flop-leaning"},
+                {"range": [40, 60], "name": "Borderline"},
+                {"range": [60, 100], "name": "Hit-leaning"},
+            ],
+            "threshold": {
+                "line": {"width": 4},
+                "thickness": 0.75,
+                "value": 50
+            }
+        }
+    ))
+    st.plotly_chart(fig_gauge, use_container_width=True)
 
-        st.markdown("#### Flop → Hit Probability")
-        # Progress bar expects 0–1
-        st.progress(p_hit)
+    # ---- Interactive Bar (Flop vs Hit) ----
+    fig_bar = go.Figure(data=[
+        go.Bar(
+            x=["FLOP", "HIT"],
+            y=[p_flop, p_hit],
+            text=[f"{p_flop:.2f}", f"{p_hit:.2f}"],
+            textposition="auto",
+            hovertemplate="<b>%{x}</b><br>Probability=%{y:.2f}<extra></extra>"
+        )
+    ])
+    fig_bar.update_layout(
+        title="Probability Breakdown",
+        yaxis=dict(range=[0, 1], title="Probability"),
+        xaxis=dict(title="Outcome"),
+    )
+    st.plotly_chart(fig_bar, use_container_width=True)
 
-        # Labels under the bar
-        c1, c2, c3 = st.columns([1, 2, 1])
-        with c1:
-            st.caption("FLOP (0.0)")
-        with c2:
-            st.caption(f"Current: {p_hit:.2f}")
-        with c3:
-            st.caption("HIT (1.0)")
-
-        # Optional interpretation bands
-        if p_hit < 0.4:
-            st.info("Model confidence: leaning **Flop**.")
-        elif p_hit < 0.6:
-            st.warning("Model confidence: **borderline** (uncertain).")
-        else:
-            st.success("Model confidence: leaning **Hit**.")
+    # Optional: a clear final label
+    label = "✅ HIT" if p_hit >= 0.5 else "❌ FLOP"
+    st.markdown(f"## Result: {label}")
